@@ -1,0 +1,28 @@
+# Ambientes Virtuais
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Variáveis de Configuração e Chaves de API (MUITO IMPORTANTE)
+.env
+.env.local
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Opcional: ignorar a base local se você não quiser publicar as questões ou tarefas
+# dados_questoes.csv
+# dados_tarefas.csv
+
+# Outros diretórios e arquivos gerados (VS Code, OS)
+.vscode/
+.idea/
+.DS_Store
+*.log

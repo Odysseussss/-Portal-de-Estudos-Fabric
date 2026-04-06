@@ -1,0 +1,12 @@
+[project]
+name = "portal-de-estudos-fabric"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "groq>=1.1.2",
+    "pandas>=2.3.3",
+    "plotly>=6.6.0",
+    "python-dotenv>=1.2.2",
+    "streamlit>=1.55.0",
+]
