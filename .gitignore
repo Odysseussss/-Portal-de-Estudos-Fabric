@@ -6,7 +6,7 @@ ENV/
 env.bak/
 venv.bak/
 
-# Variáveis de Configuração e Chaves de API (MUITO IMPORTANTE)
+# Variáveis de Configuração e Chaves de API (NUNCA publicar)
 .env
 .env.local
 .env.*
@@ -17,11 +17,13 @@ __pycache__/
 *$py.class
 *.so
 
-# Opcional: ignorar a base local se você não quiser publicar as questões ou tarefas
-# dados_questoes.csv
-# dados_tarefas.csv
+# Tarefas locais (cada usuário cria as suas via session_state)
+dados_tarefas.csv
 
-# Outros diretórios e arquivos gerados (VS Code, OS)
+# NÃO ignorar dados_questoes.csv — ele é o produto!
+# O banco de questões vai junto no deploy.
+
+# Outros
 .vscode/
 .idea/
 .DS_Store
