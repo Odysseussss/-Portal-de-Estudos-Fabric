@@ -308,33 +308,53 @@ def pagina_questoes():
 
     opcoes = [_alt("A"), _alt("B"), _alt("C"), _alt("D")]
 
-    with st.form("form_responder"):
-        escolha = st.radio("Sua resposta:", opcoes, horizontal=False)
-        confianca = st.select_slider("Nível de Confiança:", options=["Chute", "Pouco Confiante", "Confiante", "Certeza"])
-        enviar = st.form_submit_button("📨 Enviar Resposta")
+    # Se a questão atual acabou de ser respondida (para mostrar a explicação)
+    estado_resp = st.session_state.get("questao_atual_respondida")
+    
+    if estado_resp and estado_resp["id"] == q['ID']:
+        letra_escolhida = estado_resp["resposta"]
+        correta = estado_resp["correta"]
+        explicacao = estado_resp["explicacao"]
 
-        if enviar:
-            letra_escolhida = escolha[0]
-            correta = str(q['Resposta_Correta']).strip().upper()
+        st.radio("Sua resposta:", opcoes, index=["A", "B", "C", "D"].index(letra_escolhida[0]), disabled=True)
+        st.select_slider("Nível de Confiança:", options=["Chute", "Pouco Confiante", "Confiante", "Certeza"], value=estado_resp["confianca"], disabled=True)
+        
+        if letra_escolhida[0] == correta:
+            st.success(f"✅ Correto! A resposta é **{correta})**")
+        else:
+            st.error(f"❌ Errou! Você marcou **{letra_escolhida[0]})**, mas a correta é **{correta})**")
 
-            # Salvar resposta no session_state (por sessão do navegador)
+        if explicacao and explicacao not in ("", "nan"):
+            st.info(f"💡 **Explicação:**\n\n{explicacao}")
+            
+        if st.button("➡️ Próxima Questão"):
+            # Salvar resposta no session_state (por sessão do navegador) e avançar
             st.session_state.respostas_usuario[q['ID']] = {
-                "resposta": letra_escolhida,
-                "confianca": confianca,
+                "resposta": letra_escolhida[0],
+                "confianca": estado_resp["confianca"],
                 "data": str(datetime.date.today())
             }
-
-            if letra_escolhida == correta:
-                st.success(f"✅ Correto! A resposta é **{correta})**")
-            else:
-                st.error(f"❌ Errou! Você marcou **{letra_escolhida})**, mas a correta é **{correta})**")
-
-            explicacao = str(q.get("Explicacao", "")).strip()
-            if explicacao and explicacao not in ("", "nan"):
-                with st.expander("💡 Ver Explicação"):
-                    st.info(explicacao)
-
+            st.session_state.questao_atual_respondida = None
             st.rerun()
+
+    else:
+        with st.form("form_responder"):
+            escolha = st.radio("Sua resposta:", opcoes, horizontal=False)
+            confianca = st.select_slider("Nível de Confiança:", options=["Chute", "Pouco Confiante", "Confiante", "Certeza"])
+            enviar = st.form_submit_button("📨 Enviar Resposta")
+
+            if enviar:
+                correta = str(q['Resposta_Correta']).strip().upper()
+                explicacao = str(q.get("Explicacao", "")).strip()
+
+                st.session_state.questao_atual_respondida = {
+                    "id": q['ID'],
+                    "resposta": escolha,
+                    "confianca": confianca,
+                    "correta": correta,
+                    "explicacao": explicacao
+                }
+                st.rerun()
 
 
 def pagina_kanban():
