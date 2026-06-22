@@ -84,7 +84,8 @@ with st.sidebar:
     st.image("https://img.icons8.com/fluency/144/database.png", width=80)
     st.title("Portal de Estudos")
 
-    data_prova = st.date_input("🎯 Data da sua Prova:", value=st.session_state.get('data_prova_cache', datetime.date(2026, 5, 23)))
+    _data_padrao = datetime.date.today() + datetime.timedelta(days=90)
+    data_prova = st.date_input("🎯 Data da sua Prova:", value=st.session_state.get('data_prova_cache', _data_padrao))
     st.session_state.data_prova_cache = data_prova
 
     dias_restantes = (data_prova - datetime.date.today()).days
