@@ -3,33 +3,9 @@ import pandas as pd
 import datetime
 import plotly.express as px
 import os
-import json
 
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Portal de Estudos DP-700", page_icon="📊", layout="wide")
-
-# --- DETECÇÃO DE MODO: ADMIN (local) vs PÚBLICO (produção) ---
-# Se existir .env com GROQ_API_KEY, estamos em modo admin (sua máquina).
-# Em produção (Streamlit Cloud), não haverá .env nem chave → modo público.
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass  # Em produção, python-dotenv pode não estar instalado
-
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODO_ADMIN = bool(GROQ_API_KEY)
-
-# Groq client só é criado no modo admin
-groq_client = None
-if MODO_ADMIN:
-    from groq import Groq
-    
-    @st.cache_resource
-    def get_groq_client():
-        return Groq(api_key=os.getenv("GROQ_API_KEY"))
-    
-    groq_client = get_groq_client()
 
 
 # --- SCHEMA E ARQUIVOS DE DADOS ---
@@ -42,20 +18,44 @@ def _garantir_arquivo_questoes():
         pd.DataFrame(columns=COLUNAS_QUESTOES).to_csv(ARQUIVO_QUESTOES, index=False)
     else:
         df = pd.read_csv(ARQUIVO_QUESTOES)
-        for col in COLUNAS_QUESTOES:
-            if col not in df.columns:
+        colunas_faltantes = [col for col in COLUNAS_QUESTOES if col not in df.columns]
+        if colunas_faltantes:
+            for col in colunas_faltantes:
                 df[col] = ""
-        df.to_csv(ARQUIVO_QUESTOES, index=False)
+            df.to_csv(ARQUIVO_QUESTOES, index=False)
 
-_garantir_arquivo_questoes()
+@st.cache_resource
+def _executar_garantia_uma_vez():
+    _garantir_arquivo_questoes()
+    return True
+
+_executar_garantia_uma_vez()
 
 
 # --- KANBAN: DADOS EM SESSION_STATE (por sessão do navegador) ---
 # Cada usuário terá seu próprio Kanban isolado na memória do navegador.
 # Os dados NÃO são persistidos em disco — só existem enquanto a aba estiver aberta.
+ARQUIVO_TAREFAS = "dados_tarefas.csv"
+
 def _inicializar_kanban():
     if "kanban_tarefas" not in st.session_state:
-        st.session_state.kanban_tarefas = []
+        if os.path.exists(ARQUIVO_TAREFAS):
+            try:
+                df_t = pd.read_csv(ARQUIVO_TAREFAS)
+                tarefas = []
+                for _, row in df_t.iterrows():
+                    tarefas.append({
+                        "tarefa": str(row.get('Tarefa', '')),
+                        "descricao": str(row.get('Descricao', '')),
+                        "status": str(row.get('Status', 'Pendente')),
+                        "prioridade": str(row.get('Prioridade', 'Média')),
+                        "data": str(row.get('Data_Criacao', datetime.date.today()))
+                    })
+                st.session_state.kanban_tarefas = tarefas
+            except Exception:
+                st.session_state.kanban_tarefas = []
+        else:
+            st.session_state.kanban_tarefas = []
 
 _inicializar_kanban()
 
@@ -75,51 +75,8 @@ _inicializar_respostas()
 def carregar_dados_questoes():
     return pd.read_csv(ARQUIVO_QUESTOES)
 
-def salvar_questoes(df: pd.DataFrame):
-    """Só usado em modo admin para persistência no CSV."""
-    df.to_csv(ARQUIVO_QUESTOES, index=False)
-    st.cache_data.clear()
-
-
-# --- INTEGRAÇÃO COM IA (Apenas modo admin) ---
-def gerar_lote_questoes_com_ia(topico: str, quantidade: int):
-    if not groq_client:
-        return None, "A chave GROQ_API_KEY não está configurada no arquivo .env."
-
-    prompt = f"""
-    Você é um especialista certificado na prova Microsoft DP-700 (Data Engineering on Microsoft Fabric).
-    Crie exatamente {quantidade} questões de múltipla escolha complexas e práticas focadas no tópico: '{topico}'.
-    Gere questões bastante variadas dentro desse tópico.
-
-    A saída DEVE ser estritamente um JSON no formato:
-    {{
-        "questoes": [
-            {{
-                "pergunta": "Texto do enunciado da questão (apenas o cenário/problema, SEM as alternativas)",
-                "alternativa_a": "Texto completo da alternativa A",
-                "alternativa_b": "Texto completo da alternativa B",
-                "alternativa_c": "Texto completo da alternativa C",
-                "alternativa_d": "Texto completo da alternativa D",
-                "resposta_correta": "Letra da resposta correta (A, B, C ou D)",
-                "explicacao": "Explicação detalhada de por que a resposta correta está certa e porque as outras estão erradas"
-            }}
-        ]
-    }}
-    """
-    try:
-        response = groq_client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "Você gera exclusivamente JSON válido contendo uma lista de questões de prova em um objeto com a chave 'questoes'."},
-                {"role": "user", "content": prompt}
-            ],
-            model="llama-3.3-70b-versatile",
-            temperature=0.7,
-            response_format={"type": "json_object"}
-        )
-        dados = json.loads(response.choices[0].message.content.strip())
-        return dados.get("questoes", []), None
-    except Exception as e:
-        return None, f"Erro ao chamar a API do Groq: {str(e)}"
+# --- INTEGRAÇÃO COM IA REMOVIDA ---
+# As questões devem ser inseridas manualmente no CSV localmente.
 
 
 # --- SIDEBAR ---
@@ -140,16 +97,12 @@ with st.sidebar:
 
     st.divider()
 
-    # Menu: público vê 3 opções, admin vê 5
+    # Menu: público vê 3 opções
     menu_opcoes = ["📊 Dashboard", "✍️ Praticar Questões", "📋 Minhas Metas"]
-    if MODO_ADMIN:
-        menu_opcoes.extend(["🚀 Gerar Questões (IA)", "⚙️ Configurações"])
 
     opcao = st.radio("Navegação:", menu_opcoes)
 
     st.divider()
-    if MODO_ADMIN:
-        st.success("🔓 Modo Administrador")
     st.caption("Desenvolvido por Ulisses de Pinho")
     st.markdown("[Me siga no LinkedIn](https://www.linkedin.com/in/ulisses-de-pinho/)")
 
@@ -181,10 +134,7 @@ def pagina_dashboard():
         if qid in respostas:
             resp_viva = respostas[qid]['resposta']
             conf_viva = respostas[qid]['confianca']
-        # 2. Backup: histórico gravado no CSV
-        elif str(row.get('Sua_Resposta', "")).strip() != "" and str(row.get('Sua_Resposta', "")).strip() != "nan":
-            resp_viva = str(row['Sua_Resposta']).strip()
-            conf_viva = str(row.get('Confianca', 'Confiante')).strip()
+        # 2. Backup do CSV removido para manter isolamento total da sessão.
 
         if resp_viva:
             dados_consolidados.append({
@@ -266,7 +216,14 @@ def pagina_questoes():
 
     # Filtro de Tópico
     topicos_unicos = df_q['Topico'].dropna().unique().tolist()
-    opcoes_topicos = ["Todos os tópicos"] + sorted(topicos_unicos)
+    
+    def sort_key(t):
+        try:
+            return int(t.split('.')[0])
+        except:
+            return 999
+            
+    opcoes_topicos = ["Todos os tópicos"] + sorted(topicos_unicos, key=sort_key)
     topico_selecionado = st.selectbox("🎯 Filtrar por Tópico:", opcoes_topicos, key="select_topico_responder")
 
     if topico_selecionado != "Todos os tópicos":
@@ -447,90 +404,6 @@ def pagina_kanban():
                 criar_card(t, idx)
 
 
-# ══════════════════════════════════════════════════════════════
-# PÁGINAS ADMINISTRATIVAS (Só aparecem quando GROQ_API_KEY existe)
-# ══════════════════════════════════════════════════════════════
-
-def pagina_gerar_ia():
-    st.title("🚀 Gerar Questões com IA")
-    st.write("Abasteça seu banco de questões local. Crie lotes sobre os tópicos da prova DP-700.")
-
-    col1, col2 = st.columns(2)
-    topico_ia = col1.selectbox("Tópico da questão:", [
-        "1. Planejar Ambiente", "2. Ingestão de Dados",
-        "3. Transformação Spark", "4. Modelagem Direct Lake",
-        "5. Segurança e Governança", "6. Monitoramento e Otimização",
-        "7. RLS (Row-Level Security)", "8. OLS (Object-Level Security)",
-        "9. T-SQL no Warehouse", "10. Configuração de Tenant e Capacidade",
-        "11. Shortcuts e Espelhamento (Mirroring)"
-    ], key="top_ia")
-    quantidade = col2.slider("Quantidade de questões:", min_value=10, max_value=30, value=10, step=5)
-
-    if st.button("✨ Gerar e Salvar Lote"):
-        with st.spinner(f"Llama 3.3 elaborando {quantidade} questões sobre '{topico_ia}'..."):
-            questoes_geradas, erro = gerar_lote_questoes_com_ia(topico_ia, quantidade)
-
-        if erro:
-            st.error(erro)
-        elif questoes_geradas:
-            df_q = carregar_dados_questoes()
-            novo_id_inicial = int(df_q["ID"].max()) + 1 if not df_q.empty and df_q["ID"].notna().any() else 1
-
-            novas_linhas = []
-            for i, dados in enumerate(questoes_geradas):
-                nova = {
-                    "ID": novo_id_inicial + i,
-                    "Topico": topico_ia,
-                    "Pergunta": dados.get("pergunta", ""),
-                    "Alt_A": dados.get("alternativa_a", ""),
-                    "Alt_B": dados.get("alternativa_b", ""),
-                    "Alt_C": dados.get("alternativa_c", ""),
-                    "Alt_D": dados.get("alternativa_d", ""),
-                    "Resposta_Correta": dados.get("resposta_correta", "A").upper().strip(),
-                    "Explicacao": dados.get("explicacao", ""),
-                    "Sua_Resposta": "", "Confianca": "", "Data_Resposta": ""
-                }
-                novas_linhas.append(nova)
-
-            salvar_questoes(pd.concat([df_q, pd.DataFrame(novas_linhas)], ignore_index=True))
-            st.success(f"✅ {len(questoes_geradas)} questões geradas e salvas!")
-
-            with st.expander("👁️ Preview (primeira do lote)"):
-                primeira = questoes_geradas[0]
-                st.markdown(f"**Enunciado:** {primeira.get('pergunta', '')}")
-                st.info(f"**Gabarito:** {primeira.get('resposta_correta', '').upper()}")
-                st.markdown(f"**Explicação:** {primeira.get('explicacao', '')}")
-
-    # Estatísticas do banco
-    st.divider()
-    st.subheader("📦 Banco de Questões Atual")
-    df_q = carregar_dados_questoes()
-    if not df_q.empty:
-        st.metric("Total de questões no banco", len(df_q))
-        st.dataframe(df_q[['ID', 'Topico', 'Pergunta']].head(20), width=900)
-    else:
-        st.info("Banco vazio.")
-
-
-def pagina_configuracoes():
-    st.title("⚙️ Configurações do Portal")
-    st.subheader("Gerenciar Dados Locais")
-    st.warning("⚠️ Atenção: as ações abaixo apagam dados permanentemente.")
-
-    col1, col2 = st.columns(2)
-    if col1.button("🔥 Resetar Questões"):
-        if os.path.exists(ARQUIVO_QUESTOES):
-            os.remove(ARQUIVO_QUESTOES)
-            _garantir_arquivo_questoes()
-            st.cache_data.clear()
-            st.success("Dados de questões resetados.")
-
-    if col2.button("🔥 Limpar Respostas da Sessão"):
-        st.session_state.respostas_usuario = {}
-        st.success("Suas respostas foram limpas.")
-        st.rerun()
-
-
 # --- ROTEAMENTO ---
 if opcao == "📊 Dashboard":
     pagina_dashboard()
@@ -538,7 +411,3 @@ elif opcao == "✍️ Praticar Questões":
     pagina_questoes()
 elif opcao == "📋 Minhas Metas":
     pagina_kanban()
-elif opcao == "🚀 Gerar Questões (IA)" and MODO_ADMIN:
-    pagina_gerar_ia()
-elif opcao == "⚙️ Configurações" and MODO_ADMIN:
-    pagina_configuracoes()

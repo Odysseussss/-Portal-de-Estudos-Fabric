@@ -1,5 +1,1 @@
 Tarefa,Descricao,Status,Prioridade,Data_Criacao
-Planejar e Implementar um Ambiente de Análise,"Este tópico será o seu dia a dia do planejamento a manutenção, governança e controle de custos.
-Configuração de Tenant e Capacidade: Gerenciar permissões, domínios e configurações de segurança.
-Administração de Workspaces: Controle de acesso (RBAC), atribuição de capacidades e monitoramento de consumo (CUs).
-Segurança de Dados: Implementar RLS (Row-Level Security), OLS (Object-Level Security) e mascaramento de dados sensíveis.",Em Andamento,Alta,2026-03-28
