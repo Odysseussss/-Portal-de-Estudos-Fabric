@@ -11,7 +11,8 @@ st.set_page_config(page_title="Portal de Estudos DP-700", page_icon="📊", layo
 # --- SCHEMA E ARQUIVOS DE DADOS ---
 ARQUIVO_QUESTOES = "dados_questoes.csv"
 COLUNAS_QUESTOES = ["ID", "Topico", "Pergunta", "Alt_A", "Alt_B", "Alt_C", "Alt_D",
-                    "Resposta_Correta", "Explicacao", "Sua_Resposta", "Confianca", "Data_Resposta"]
+                    "Resposta_Correta", "Explicacao"]
+STATUS_TAREFAS = ["Pendente", "Em Andamento", "Concluído"]
 
 def _garantir_arquivo_questoes():
     if not os.path.exists(ARQUIVO_QUESTOES):
@@ -342,7 +343,7 @@ def pagina_kanban():
             desc = st.text_area("Detalhes adicionais")
             c1, c2 = st.columns(2)
             prioridade = c1.selectbox("Prioridade", ["Alta", "Média", "Baixa"])
-            status_inicial = c2.selectbox("Status Inicial", ["Pendente", "Em Andamento", "Concluído"])
+            status_inicial = c2.selectbox("Status Inicial", STATUS_TAREFAS)
 
             if st.form_submit_button("💾 Salvar Meta"):
                 if tarefa.strip():
@@ -374,8 +375,8 @@ def pagina_kanban():
                 st.caption(tarefa_dict['descricao'])
 
             col_a, col_b = st.columns([3, 1])
-            novo_status = col_a.selectbox("Mover para:", ["Pendente", "Em Andamento", "Concluído"],
-                                          index=["Pendente", "Em Andamento", "Concluído"].index(tarefa_dict['status']),
+            novo_status = col_a.selectbox("Mover para:", STATUS_TAREFAS,
+                                          index=STATUS_TAREFAS.index(tarefa_dict['status']),
                                           key=f"status_{idx}", label_visibility="collapsed")
 
             if col_b.button("🗑️", key=f"del_{idx}"):
